@@ -74,6 +74,7 @@ public class StringSetImpl implements StringSet, StreamSerializable {
             out.write(begin.isTerminal ? 1 : 0);
             while (!stackOfNodes.empty()) {
                 StringSetNode curNode = stackOfNodes.pop();
+                boolean goDown = false;
                 for (int index = stackOfIndices.pop(); index < ALPHABET_SIZE; index++) {
                     if (curNode.canGo(index)) {
                         out.write(index);
@@ -83,11 +84,12 @@ public class StringSetImpl implements StringSet, StreamSerializable {
                         stackOfNodes.push(curNode);
                         stackOfNodes.push(nextNode);
                         stackOfIndices.push(0);
+                        goDown = true;
                         break;
                     }
-                    if (index == ALPHABET_SIZE - 1) {
-                        out.write(255);
-                    }
+                }
+                if (!goDown) {
+                    out.write(255);
                 }
             }
         }
