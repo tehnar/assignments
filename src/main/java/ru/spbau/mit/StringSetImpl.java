@@ -71,6 +71,7 @@ public class StringSetImpl implements StringSet, StreamSerializable {
         stackOfNodes.push(begin);
         stackOfIndices.push(0);
         try {
+            out.write(begin.isTerminal ? 1 : 0);
             while (!stackOfNodes.empty()) {
                 StringSetNode curNode = stackOfNodes.pop();
                 for (int index = stackOfIndices.pop(); index < ALPHABET_SIZE; index++) {
@@ -101,6 +102,7 @@ public class StringSetImpl implements StringSet, StreamSerializable {
         Stack<StringSetNode> stackOfNodes = new Stack<>();
         stackOfNodes.push(begin);
         try {
+            begin.setTerminal(in.read() > 0);
             while (!stackOfNodes.empty()) {
                 int val = in.read();
                 if (val == 255) {
@@ -111,7 +113,6 @@ public class StringSetImpl implements StringSet, StreamSerializable {
                 } else {
                     StringSetNode node = stackOfNodes.peek().go(val);
                     node.setTerminal(in.read() > 0);
-                    System.err.println(node.isTerminal);
                     stackOfNodes.push(node);
                 }
             }
@@ -148,13 +149,14 @@ public class StringSetImpl implements StringSet, StreamSerializable {
                 curNode = curNode.go(element.charAt(i));
             }
         }
-
         return result;
     }
 
     @Override
     public boolean contains(String element) {
-        return processString(element) != null;
+        StringSetNode node = processString(element);
+        return node == null ? false : node.isTerminal;
+
     }
 
     @Override
