@@ -3,19 +3,17 @@ package ru.spbau.mit;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.lang.Override;
 import java.lang.String;
-import java.util.Stack;
 
 public class StringSetImpl implements StringSet, StreamSerializable {
-    final static int ALPHABET_SIZE = 2 * 26;
-    class StringSetNode {
-        private StringSetNode[] go;
+    private final static int ALPHABET_SIZE = 2 * 26;
+    private static class StringSetNode {
+        private StringSetNode[] goByChar;
         private boolean isTerminal;
         private int subtreeStringsCount;
 
         public StringSetNode() {
-            go = new StringSetNode[ALPHABET_SIZE];
+            goByChar = new StringSetNode[ALPHABET_SIZE];
             isTerminal = false;
             subtreeStringsCount = 0;
         }
@@ -27,24 +25,24 @@ public class StringSetImpl implements StringSet, StreamSerializable {
                 return c - 'A' + 26;
             }
         }
-        public StringSetNode go(int index) {
-            if (go[index] == null) {
-                go[index] = new StringSetNode();
+        public StringSetNode goByIndex(int index) {
+            if (goByChar[index] == null) {
+                goByChar[index] = new StringSetNode();
             }
 
-            return go[index];
+            return goByChar[index];
         }
 
-        public StringSetNode go(char c) {
-            return go(charToIndex(c));
+        public StringSetNode goByChar(char c) {
+            return goByIndex(charToIndex(c));
         }
 
-        public boolean canGo(int index) {
-            return go[index] != null;
+        public boolean canGoByIndex(int index) {
+            return goByChar[index] != null;
         }
 
-        public boolean canGo(char c) {
-            return canGo(charToIndex(c));
+        public boolean canGoByChar(char c) {
+            return canGoByIndex(charToIndex(c));
         }
 
         public void setTerminal(boolean val) {
@@ -64,70 +62,48 @@ public class StringSetImpl implements StringSet, StreamSerializable {
         begin = new StringSetNode();
     }
 
-    @Override
-    public void serialize(OutputStream out) {
-        Stack<StringSetNode> stackOfNodes = new Stack<>();
-        Stack<Integer> stackOfIndices = new Stack<>();
-        stackOfNodes.push(begin);
-        stackOfIndices.push(0);
+    private void serializeDFS(StringSetNode curNode, OutputStream out) {
         try {
-            out.write(begin.isTerminal ? 1 : 0);
-            while (!stackOfNodes.empty()) {
-                StringSetNode curNode = stackOfNodes.pop();
-                boolean goDown = false;
-                for (int index = stackOfIndices.pop(); index < ALPHABET_SIZE; index++) {
-                    if (curNode.canGo(index)) {
-                        out.write(index);
-                        StringSetNode nextNode = curNode.go(index);
-                        out.write(nextNode.isTerminal ? 1 : 0);
-                        stackOfIndices.push(index + 1);
-                        stackOfNodes.push(curNode);
-                        stackOfNodes.push(nextNode);
-                        stackOfIndices.push(0);
-                        goDown = true;
-                        break;
-                    }
-                }
-                if (!goDown) {
-                    out.write(255);
+            out.write(curNode.isTerminal ? 1 : 0);
+            for (int index = 0; index < ALPHABET_SIZE; index++) {
+                if (curNode.canGoByIndex(index)) {
+                    out.write(index);
+                    serializeDFS(curNode.goByIndex(index), out);
                 }
             }
-        }
-        catch (IOException e) {
+            out.write(255);
+        } catch (IOException e) {
             throw new SerializationException();
         }
     }
-
     @Override
-    public void deserialize(InputStream in) {
-        begin = new StringSetNode();
-        Stack<StringSetNode> stackOfNodes = new Stack<>();
-        stackOfNodes.push(begin);
+    public void serialize(OutputStream out) {
+        serializeDFS(begin, out);
+    }
+
+    private void deserializeDFS(StringSetNode curNode, InputStream in) {
         try {
-            begin.setTerminal(in.read() > 0);
-            while (!stackOfNodes.empty()) {
-                int val = in.read();
-                if (val == 255) {
-                    int substringCnt = stackOfNodes.pop().subtreeStringsCount;
-                    if (!stackOfNodes.empty()) {
-                        stackOfNodes.peek().subtreeStringsCount += substringCnt;
-                    }
-                } else {
-                    StringSetNode node = stackOfNodes.peek().go(val);
-                    node.setTerminal(in.read() > 0);
-                    stackOfNodes.push(node);
-                }
+            curNode.setTerminal(in.read() > 0);
+            int val = in.read();
+            while (val != 255) {
+                deserializeDFS(curNode.goByIndex(val), in);
+                val = in.read();
             }
         } catch (IOException e) {
             throw new SerializationException();
         }
     }
 
+    @Override
+    public void deserialize(InputStream in) {
+        deserializeDFS(begin, in);
+    }
+
     private StringSetNode processString(String str) {
         StringSetNode curNode = begin;
         for (int i = 0; i < str.length(); i++) {
-            if (curNode.canGo(str.charAt(i))) {
-                curNode = curNode.go(str.charAt(i));
+            if (curNode.canGoByChar(str.charAt(i))) {
+                curNode = curNode.goByChar(str.charAt(i));
             } else {
                 return null;
             }
@@ -139,7 +115,7 @@ public class StringSetImpl implements StringSet, StreamSerializable {
     public boolean add(String element) {
         StringSetNode curNode = begin;
         for (int i = 0; i < element.length(); i++) {
-            curNode = curNode.go(element.charAt(i));
+            curNode = curNode.goByChar(element.charAt(i));
         }
         boolean result = !curNode.isTerminal;
         curNode.setTerminal(true);
@@ -148,7 +124,7 @@ public class StringSetImpl implements StringSet, StreamSerializable {
             curNode = begin;
             for (int i = 0; i < element.length(); i++) {
                 curNode.subtreeStringsCount++;
-                curNode = curNode.go(element.charAt(i));
+                curNode = curNode.goByChar(element.charAt(i));
             }
         }
         return result;
@@ -157,20 +133,21 @@ public class StringSetImpl implements StringSet, StreamSerializable {
     @Override
     public boolean contains(String element) {
         StringSetNode node = processString(element);
-        return node == null ? false : node.isTerminal;
+        return node != null && node.isTerminal;
 
     }
 
     @Override
     public boolean remove(String element) {
         boolean result = contains(element);
-        if (!result)
+        if (!result) {
             return false;
+        }
 
         StringSetNode curNode = begin;
         for (int i = 0; i < element.length(); i++) {
             curNode.subtreeStringsCount--;
-            curNode = curNode.go(element.charAt(i));
+            curNode = curNode.goByChar(element.charAt(i));
         }
         curNode.setTerminal(false);
         return true;
