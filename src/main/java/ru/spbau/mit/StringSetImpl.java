@@ -86,7 +86,9 @@ public class StringSetImpl implements StringSet, StreamSerializable {
             curNode.setTerminal(in.read() > 0);
             int val = in.read();
             while (val != 255) {
-                deserializeDFS(curNode.goByIndex(val), in);
+                StringSetNode child = curNode.goByIndex(val);
+                deserializeDFS(child, in);
+                curNode.subtreeStringsCount += child.subtreeStringsCount;
                 val = in.read();
             }
         } catch (IOException e) {
