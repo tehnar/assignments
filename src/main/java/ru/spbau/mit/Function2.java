@@ -6,7 +6,7 @@ package ru.spbau.mit;
 public abstract class Function2 <T1, T2, R> {
     public abstract R apply (T1 x, T2 y);
 
-    public <E> Function2 <T1, T2, E> compose (final Function1 <? super R, E> g) {
+    public <E> Function2 <T1, T2, E> compose(final Function1<? super R, E> g) {
         return new Function2 <T1, T2, E> () {
             @Override
             public E apply(T1 x, T2 y) {

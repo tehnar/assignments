@@ -14,12 +14,4 @@ public abstract class Function1 <T, R> {
             }
         };
     }
-
-    public static void main(String[] args) {
-        Function1<Integer, Integer> fact = null;
-        Function1<Object, String> g = null;
-
-        fact.compose(g);
-
-    }
 }
