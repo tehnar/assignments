@@ -115,21 +115,16 @@ public class StringSetImpl implements StringSet, StreamSerializable {
 
     @Override
     public boolean add(String element) {
-        StringSetNode curNode = begin;
-        for (int i = 0; i < element.length(); i++) {
-            curNode = curNode.goByChar(element.charAt(i));
-        }
-        boolean result = !curNode.isTerminal;
-        curNode.setTerminal(true);
-
-        if (result) {
-            curNode = begin;
+        boolean result = contains(element);
+        if (!result) {
+            StringSetNode curNode = begin;
             for (int i = 0; i < element.length(); i++) {
                 curNode.subtreeStringsCount++;
                 curNode = curNode.goByChar(element.charAt(i));
             }
+            curNode.setTerminal(true);
         }
-        return result;
+        return !result;
     }
 
     @Override
