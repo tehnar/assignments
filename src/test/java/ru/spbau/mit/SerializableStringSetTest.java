@@ -26,7 +26,7 @@ public class SerializableStringSetTest {
 
         assertTrue(stringSet.add("abc"));
         assertTrue(stringSet.add("cde"));
-
+        assertTrue(stringSet.add("abd"));
         ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
         ((StreamSerializable) stringSet).serialize(outputStream);
 
@@ -36,6 +36,8 @@ public class SerializableStringSetTest {
 
         assertTrue(newStringSet.contains("abc"));
         assertTrue(newStringSet.contains("cde"));
+        assertTrue(newStringSet.contains("abd"));
+        assertEquals(newStringSet.howManyStartsWithPrefix("a"), 2);
     }
 
 
