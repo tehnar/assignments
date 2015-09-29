@@ -81,24 +81,24 @@ public class StringSetImpl implements StringSet, StreamSerializable {
         serializeDFS(begin, out);
     }
 
-    private void deserializeDFS(StringSetNode curNode, InputStream in) {
+    private int deserializeDFS(StringSetNode curNode, InputStream in) {
         try {
             curNode.setTerminal(in.read() > 0);
             int val = in.read();
             while (val != 255) {
                 StringSetNode child = curNode.goByIndex(val);
-                deserializeDFS(child, in);
-                curNode.subtreeStringsCount += child.subtreeStringsCount;
+                curNode.subtreeStringsCount  += deserializeDFS(child, in);
                 val = in.read();
             }
         } catch (IOException e) {
             throw new SerializationException();
         }
+        return curNode.subtreeStringsCount;
     }
 
     @Override
     public void deserialize(InputStream in) {
-        deserializeDFS(begin, in);
+        deserializeDFS(begin = new StringSetNode(), in);
     }
 
     private StringSetNode processString(String str) {
