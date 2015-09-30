@@ -27,7 +27,11 @@ public class TreeSetImpl<E> extends AbstractSet<E> {
 
         @Override
         public void remove() {
-            throw new IllegalStateException();
+            if (lastNode == null) {
+                throw new IllegalStateException();
+            }
+            TreeSetImpl.this.remove(lastNode.value);
+            lastNode = null;
         }
     }
 
@@ -41,7 +45,8 @@ public class TreeSetImpl<E> extends AbstractSet<E> {
         }
 
 
-        void updateChildParents() {
+        void updateParents() {
+            parent = null;
             if (left != null) {
                 left.parent = this;
             }
@@ -73,11 +78,11 @@ public class TreeSetImpl<E> extends AbstractSet<E> {
 
         if (left.height > right.height) {
             left.right = merge(left.right, right);
-            left.updateChildParents();
+            left.updateParents();
             return left;
         } else {
             right.left = merge(left, right.left);
-            right.updateChildParents();
+            right.updateParents();
             return right;
         }
     }
@@ -89,12 +94,12 @@ public class TreeSetImpl<E> extends AbstractSet<E> {
         if (comparator.compare(root.value, val) > 0) {
             PairOfNodes tmp = split(root.left, val);
             root.left = tmp.second;
-            root.updateChildParents();
+            root.updateParents();
             return new PairOfNodes(tmp.first, root);
         } else {
             PairOfNodes tmp = split(root.right, val);
             root.right = tmp.first;
-            root.updateChildParents();
+            root.updateParents();
             return new PairOfNodes(root, tmp.second);
         }
     }
@@ -134,18 +139,9 @@ public class TreeSetImpl<E> extends AbstractSet<E> {
         if (root.parent == null) {
             return null;
         }
-        if (root.parent.right != root)
-            return root.parent;
-        return leftmost(root.parent.right);
+        return root.parent;
     }
 
-    private boolean canGoRight(TreeSetNode root) {
-        return goRight(root) != null;
-    }
-
-    private void removeNode(TreeSetNode node) {
-        return;
-    }
     public TreeSetImpl(Comparator<E> comparator) {
         this.comparator = comparator;
     }
@@ -171,20 +167,30 @@ public class TreeSetImpl<E> extends AbstractSet<E> {
         size++;
         return true;
     }
+    private TreeSetNode removeRecursive(TreeSetNode root, E val) {
+        if (root == null) {
+            return null;
+        }
+        int resultOfComparing = comparator.compare(root.value, val);
+        if (resultOfComparing == 0) {
+            return merge(root.left, root.right);
+        } else if (resultOfComparing > 0) {
+            root.left = removeRecursive(root.left, val);
+        } else {
+            root.right = removeRecursive(root.right, val);
+        }
+
+        root.updateParents();
+        return root;
+    }
 
     public boolean remove(Object val) {
-        PairOfNodes left = split(root, (E) val);
-        TreeSetNode leftMax = rightmost(left.first);
-        if (leftMax == null) {
-            return false;
+        boolean result = contains(val);
+        if (result) {
+            root = removeRecursive(root, (E) val);
+            size--;
         }
-        if (leftMax.parent == null) {
-            root = left.second;
-        } else {
-            leftMax.parent.right = null;
-            root = merge(left.first, left.second);
-        }
-        return true;
+        return result;
     }
 
     @Override
