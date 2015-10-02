@@ -7,25 +7,28 @@ import java.lang.String;
 
 public class StringSetImpl implements StringSet, StreamSerializable {
     private final static int ALPHABET_SIZE = 2 * 26;
+    private final static int UP_BYTE = 255;
+
     private static class StringSetNode {
         private StringSetNode[] goByChar;
         private boolean isTerminal;
         private int subtreeStringsCount;
 
-        public StringSetNode() {
+        private StringSetNode() {
             goByChar = new StringSetNode[ALPHABET_SIZE];
             isTerminal = false;
             subtreeStringsCount = 0;
         }
 
-        private int charToIndex(char c) {
+        private static int charToIndex(char c) {
             if (c >= 'a' && c <= 'z') {
                 return c - 'a';
             } else {
                 return c - 'A' + 26;
             }
         }
-        public StringSetNode goByIndex(int index) {
+
+        private StringSetNode goByIndex(int index) {
             if (goByChar[index] == null) {
                 goByChar[index] = new StringSetNode();
             }
@@ -33,19 +36,19 @@ public class StringSetImpl implements StringSet, StreamSerializable {
             return goByChar[index];
         }
 
-        public StringSetNode goByChar(char c) {
+        private StringSetNode goByChar(char c) {
             return goByIndex(charToIndex(c));
         }
 
-        public boolean canGoByIndex(int index) {
+        private boolean canGoByIndex(int index) {
             return goByChar[index] != null;
         }
 
-        public boolean canGoByChar(char c) {
+        private boolean canGoByChar(char c) {
             return canGoByIndex(charToIndex(c));
         }
 
-        public void setTerminal(boolean val) {
+        private void setTerminal(boolean val) {
             if (val && !isTerminal) {
                 subtreeStringsCount++;
             }
@@ -56,11 +59,7 @@ public class StringSetImpl implements StringSet, StreamSerializable {
         }
     }
 
-    private StringSetNode begin;
-
-    StringSetImpl() {
-        begin = new StringSetNode();
-    }
+    private StringSetNode begin = new StringSetNode();
 
     private void serializeDFS(StringSetNode curNode, OutputStream out) {
         try {
@@ -71,11 +70,12 @@ public class StringSetImpl implements StringSet, StreamSerializable {
                     serializeDFS(curNode.goByIndex(index), out);
                 }
             }
-            out.write(255);
+            out.write(UP_BYTE);
         } catch (IOException e) {
             throw new SerializationException();
         }
     }
+
     @Override
     public void serialize(OutputStream out) {
         serializeDFS(begin, out);
@@ -85,7 +85,7 @@ public class StringSetImpl implements StringSet, StreamSerializable {
         try {
             curNode.setTerminal(in.read() > 0);
             int val = in.read();
-            while (val != 255) {
+            while (val != UP_BYTE) {
                 StringSetNode child = curNode.goByIndex(val);
                 curNode.subtreeStringsCount  += deserializeDFS(child, in);
                 val = in.read();
@@ -98,7 +98,8 @@ public class StringSetImpl implements StringSet, StreamSerializable {
 
     @Override
     public void deserialize(InputStream in) {
-        deserializeDFS(begin = new StringSetNode(), in);
+        begin = new StringSetNode();
+        deserializeDFS(begin, in);
     }
 
     private StringSetNode processString(String str) {
@@ -131,13 +132,11 @@ public class StringSetImpl implements StringSet, StreamSerializable {
     public boolean contains(String element) {
         StringSetNode node = processString(element);
         return node != null && node.isTerminal;
-
     }
 
     @Override
     public boolean remove(String element) {
-        boolean result = contains(element);
-        if (!result) {
+        if (!contains(element)) {
             return false;
         }
 
