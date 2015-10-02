@@ -61,37 +61,33 @@ public class StringSetImpl implements StringSet, StreamSerializable {
 
     private StringSetNode begin = new StringSetNode();
 
-    private void serializeDFS(StringSetNode curNode, OutputStream out) {
-        try {
-            out.write(curNode.isTerminal ? 1 : 0);
-            for (int index = 0; index < ALPHABET_SIZE; index++) {
-                if (curNode.canGoByIndex(index)) {
-                    out.write(index);
-                    serializeDFS(curNode.goByIndex(index), out);
-                }
+    private void serializeDFS(StringSetNode curNode, OutputStream out) throws IOException {
+        out.write(curNode.isTerminal ? 1 : 0);
+        for (int index = 0; index < ALPHABET_SIZE; index++) {
+            if (curNode.canGoByIndex(index)) {
+                out.write(index);
+                serializeDFS(curNode.goByIndex(index), out);
             }
-            out.write(UP_BYTE);
+        }
+        out.write(UP_BYTE);
+    }
+
+    @Override
+    public void serialize(OutputStream out) {
+        try {
+            serializeDFS(begin, out);
         } catch (IOException e) {
             throw new SerializationException();
         }
     }
 
-    @Override
-    public void serialize(OutputStream out) {
-        serializeDFS(begin, out);
-    }
-
-    private int deserializeDFS(StringSetNode curNode, InputStream in) {
-        try {
-            curNode.setTerminal(in.read() > 0);
-            int val = in.read();
-            while (val != UP_BYTE) {
-                StringSetNode child = curNode.goByIndex(val);
-                curNode.subtreeStringsCount  += deserializeDFS(child, in);
-                val = in.read();
-            }
-        } catch (IOException e) {
-            throw new SerializationException();
+    private int deserializeDFS(StringSetNode curNode, InputStream in) throws IOException {
+        curNode.setTerminal(in.read() > 0);
+        int val = in.read();
+        while (val != UP_BYTE) {
+            StringSetNode child = curNode.goByIndex(val);
+            curNode.subtreeStringsCount += deserializeDFS(child, in);
+            val = in.read();
         }
         return curNode.subtreeStringsCount;
     }
@@ -99,14 +95,19 @@ public class StringSetImpl implements StringSet, StreamSerializable {
     @Override
     public void deserialize(InputStream in) {
         begin = new StringSetNode();
-        deserializeDFS(begin, in);
+        try {
+            deserializeDFS(begin, in);
+        } catch (IOException exception) {
+            throw new SerializationException();
+        }
     }
+
 
     private StringSetNode processString(String str) {
         StringSetNode curNode = begin;
-        for (int i = 0; i < str.length(); i++) {
-            if (curNode.canGoByChar(str.charAt(i))) {
-                curNode = curNode.goByChar(str.charAt(i));
+        for (char character : str.toCharArray()) {
+            if (curNode.canGoByChar(character)) {
+                curNode = curNode.goByChar(character);
             } else {
                 return null;
             }
@@ -116,16 +117,16 @@ public class StringSetImpl implements StringSet, StreamSerializable {
 
     @Override
     public boolean add(String element) {
-        boolean result = contains(element);
-        if (!result) {
-            StringSetNode curNode = begin;
-            for (int i = 0; i < element.length(); i++) {
-                curNode.subtreeStringsCount++;
-                curNode = curNode.goByChar(element.charAt(i));
-            }
-            curNode.setTerminal(true);
+        if (contains(element)) {
+            return false;
         }
-        return !result;
+        StringSetNode curNode = begin;
+        for (char character : element.toCharArray()) {
+            curNode.subtreeStringsCount++;
+            curNode = curNode.goByChar(character);
+        }
+        curNode.setTerminal(true);
+        return true;
     }
 
     @Override
@@ -141,9 +142,9 @@ public class StringSetImpl implements StringSet, StreamSerializable {
         }
 
         StringSetNode curNode = begin;
-        for (int i = 0; i < element.length(); i++) {
+        for (char character : element.toCharArray()) {
             curNode.subtreeStringsCount--;
-            curNode = curNode.goByChar(element.charAt(i));
+            curNode = curNode.goByChar(character);
         }
         curNode.setTerminal(false);
         return true;
