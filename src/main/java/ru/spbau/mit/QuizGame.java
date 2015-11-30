@@ -71,7 +71,7 @@ public class QuizGame implements Game {
         nextQuestion();
     }
 
-    private String letterCnt(String str) {
+    private static String letterCnt(String str) {
         return String.format(LETTER_CNT, str.length());
     }
 
@@ -114,12 +114,14 @@ public class QuizGame implements Game {
     }
 
     private void stopGame(String whoStopped) {
+        if (questionTimer != null) {
+            questionTimer.interrupt();
+        }
         server.broadcast(STOP_GAME + " " + whoStopped);
     }
 
     @Override
     synchronized public void onPlayerSentMsg(String id, String msg) {
-        System.err.println("QuizGame: processing message: " + msg);
         if (msg.equals(START_MESSAGE)) {
             startGame();
         } else if (msg.equals(STOP_MESSAGE)) {

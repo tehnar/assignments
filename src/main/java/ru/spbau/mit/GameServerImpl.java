@@ -8,45 +8,63 @@ import java.util.concurrent.LinkedBlockingQueue;
 
 public class GameServerImpl implements GameServer {
     private final ArrayList<Connection> connections = new ArrayList<>();
-    private Game gameClassInstance;
-    private Class <?> gameClass;
-    private final ArrayList <LinkedBlockingQueue<String>> messageQueue = new ArrayList<>();
-    private static boolean isInteger(String str) {
-        for (int i = 0; i < str.length(); i++) {
-            if (str.charAt(i) == '-') {
-                if (i != 0 || str.length() == 1) {
-                    return false;
-                }
-            } else {
-                char c = str.charAt(i);
-                if (c < '0' || c > '9') {
-                    return false;
-                }
-            }
-        }
-        return true;
-    }
+    private final Game gameClassInstance;
+    private final ArrayList <LinkedBlockingQueue<String> > messageQueue = new ArrayList<>();
 
-    public GameServerImpl(String gameClassName, Properties properties) {
-        try {
-            gameClass = Class.forName(gameClassName);
-            gameClassInstance = (Game) gameClass.getConstructor(GameServer.class).newInstance(this);
-            Set<String> propertyNames = properties.stringPropertyNames();
-            for (String propertyName : propertyNames) {
-                String property = properties.getProperty(propertyName);
-                String setterName = "set" + (char) (propertyName.charAt(0) + 'A' - 'a') + propertyName.substring(1);
-                if (isInteger(property)) {
-                    gameClass.getMethod(setterName, int.class).invoke(gameClassInstance, Integer.parseInt(property));
-                } else {
-                    gameClass.getMethod(setterName, String.class).invoke(gameClassInstance, property);
-                }
+    public GameServerImpl(String gameClassName, Properties properties) throws ClassNotFoundException, NoSuchMethodException, InvocationTargetException, IllegalAccessException, InstantiationException {
+        final Class <?> gameClass = Class.forName(gameClassName);
+        gameClassInstance = (Game) gameClass.getConstructor(GameServer.class).newInstance(this);
+        Set<String> propertyNames = properties.stringPropertyNames();
+        for (String propertyName : propertyNames) {
+            String property = properties.getProperty(propertyName);
+            String setterName = "set" + (char) (propertyName.charAt(0) + 'A' - 'a') + propertyName.substring(1);
+            try {
+                int num = Integer.parseInt(property);
+                gameClass.getMethod(setterName, int.class).invoke(gameClassInstance, Integer.parseInt(property));
+            } catch (NumberFormatException e) {
+                gameClass.getMethod(setterName, String.class).invoke(gameClassInstance, property);
             }
-        } catch (InstantiationException | IllegalAccessException | NoSuchMethodException | ClassNotFoundException |
-                InvocationTargetException e) {
-            e.printStackTrace();
         }
     }
 
+    private class ConnectionHandler implements Runnable {
+        private final Connection connection;
+        private final int id;
+        private final String idStr;
+
+        ConnectionHandler(int id, Connection connection) {
+            this.id = id;
+            this.connection = connection;
+            this.idStr = Integer.toString(id);
+        }
+
+        @Override
+        public void run() {
+            while (true) {
+                String message = messageQueue.get(id).poll();
+                synchronized (connection) {
+                    if (message != null) {
+                        if (connection.isClosed()) {
+                            return;
+                        }
+                        connection.send(message);
+                    }
+                    if (connection.isClosed()) {
+                        return;
+                    }
+                    try {
+                        message = connection.receive(10);
+                    } catch (InterruptedException e) {
+                    }
+                    if (message != null) {
+                        gameClassInstance.onPlayerSentMsg(idStr, message);
+                    }
+                }
+
+            }
+
+        }
+    }
     @Override
     public void accept(final Connection connection) {
         final int id = connections.size();
@@ -59,53 +77,7 @@ public class GameServerImpl implements GameServer {
             @Override
             public void run() {
                 gameClassInstance.onPlayerConnected(idStr);
-
-                new Thread(new Runnable() {
-                    int myId = id;
-                    Connection myConnection = connection;
-
-                    @Override
-                    public void run() {
-                        while (true) {
-                            String message = null;
-                            try {
-                                message = messageQueue.get(myId).take();
-                            } catch (InterruptedException e) {
-                                e.printStackTrace();
-                            }
-                            synchronized (myConnection) {
-                                if (myConnection.isClosed()) {
-                                    return;
-                                }
-                                myConnection.send(message);
-                            }
-                        }
-                    }
-                }).start();
-
-                new Thread(new Runnable() {
-                    Connection myConnection = connection;
-                    String myId = idStr;
-
-                    @Override
-                    public void run() {
-                        while (true) {
-                            try {
-                                synchronized (myConnection) {
-                                    if (myConnection.isClosed()) {
-                                        return;
-                                    }
-                                    String message = myConnection.receive(1);
-                                    if (message != null) {
-                                        gameClassInstance.onPlayerSentMsg(myId, message);
-                                    }
-                                }
-                            } catch (InterruptedException e) {
-                                e.printStackTrace();
-                            }
-                        }
-                    }
-                }).start();
+                new Thread(new ConnectionHandler(id, connection)).start();
             }
 
         }).start();
