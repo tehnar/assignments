@@ -9,7 +9,7 @@ import java.util.List;
 
 public class Injector {
     private static HashSet<Class<?>> visitedClasses;
-
+    private static HashMap<Class<?>, Object> instatinatedClasses;
     /**
      * Create and initialize object of `rootClassName` class using classes from
      * `implementationClassNames` for concrete dependencies.
@@ -36,6 +36,7 @@ public class Injector {
         Constructor<?> rootConstructor = rootClass.getConstructors()[0];
         visitedClasses = new HashSet<>();
         visitedClasses.add(rootClass);
+        instatinatedClasses = new HashMap<>();
         return construct(rootConstructor, implementationClassNames);
     }
 
@@ -49,9 +50,17 @@ public class Injector {
                 }
             }
             visitedClasses.add(param);
-            parameterInstances.add(construct(getClassConstructor(param, implementationClassNames), implementationClassNames));
+            Object paramInstance;
+            if (instatinatedClasses.containsKey(param)) {
+                paramInstance = instatinatedClasses.get(param);
+            } else {
+                paramInstance = construct(getClassConstructor(param, implementationClassNames), implementationClassNames);
+            }
+            parameterInstances.add(paramInstance);
+            instatinatedClasses.put(param, paramInstance);
             visitedClasses.remove(param);
         }
+
         return rootConstructor.newInstance(parameterInstances.toArray());
     }
 }
