@@ -43,8 +43,10 @@ public class Injector {
         Class<?>[] parameterTypes = rootConstructor.getParameterTypes();
         ArrayList<Object> parameterInstances = new ArrayList<>();
         for (Class<?> param : parameterTypes) {
-            if (visitedClasses.contains(param)) {
-                throw new InjectionCycleException();
+            for (Class <?> visitedClass : visitedClasses) {
+                if (visitedClass.isAssignableFrom(param) || param.isAssignableFrom(visitedClass)) {
+                    throw new InjectionCycleException();
+                }
             }
             visitedClasses.add(param);
             parameterInstances.add(construct(getClassConstructor(param, implementationClassNames), implementationClassNames));
