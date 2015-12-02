@@ -18,10 +18,15 @@ public class GameServerImpl implements GameServer {
         for (String propertyName : propertyNames) {
             String property = properties.getProperty(propertyName);
             String setterName = "set" + (char) (propertyName.charAt(0) + 'A' - 'a') + propertyName.substring(1);
+            Integer num ;
             try {
-                int num = Integer.parseInt(property);
-                gameClass.getMethod(setterName, int.class).invoke(gameClassInstance, Integer.parseInt(property));
+                num = Integer.parseInt(property);
             } catch (NumberFormatException e) {
+                num = null;
+            }
+            if (num != null) {
+                gameClass.getMethod(setterName, int.class).invoke(gameClassInstance, num.intValue());
+            } else {
                 gameClass.getMethod(setterName, String.class).invoke(gameClassInstance, property);
             }
         }
@@ -42,23 +47,21 @@ public class GameServerImpl implements GameServer {
         public void run() {
             while (true) {
                 String message = messageQueue.get(id).poll();
-                synchronized (connection) {
-                    if (message != null) {
-                        if (connection.isClosed()) {
-                            return;
-                        }
-                        connection.send(message);
-                    }
+                if (message != null) {
                     if (connection.isClosed()) {
                         return;
                     }
-                    try {
-                        message = connection.receive(10);
-                    } catch (InterruptedException e) {
-                    }
-                    if (message != null) {
-                        gameClassInstance.onPlayerSentMsg(idStr, message);
-                    }
+                    connection.send(message);
+                }
+                if (connection.isClosed()) {
+                    return;
+                }
+                try {
+                    message = connection.receive(10);
+                } catch (InterruptedException e) {
+                }
+                if (message != null) {
+                    gameClassInstance.onPlayerSentMsg(idStr, message);
                 }
 
             }
@@ -95,9 +98,7 @@ public class GameServerImpl implements GameServer {
         int curId = Integer.parseInt(id);
         try {
             messageQueue.get(curId).put(message);
-
         } catch (InterruptedException e) {
-            e.printStackTrace();
         }
     }
 }
