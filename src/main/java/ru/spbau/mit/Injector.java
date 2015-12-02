@@ -1,15 +1,12 @@
 package ru.spbau.mit;
 
 import java.lang.reflect.Constructor;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
+import java.util.*;
 
 
 public class Injector {
     private static HashSet<Class<?>> visitedClasses;
-    private static HashMap<Class<?>, Object> instatinatedClasses;
+    private static ArrayList<Object> instatinatedClasses;
     /**
      * Create and initialize object of `rootClassName` class using classes from
      * `implementationClassNames` for concrete dependencies.
@@ -36,7 +33,7 @@ public class Injector {
         Constructor<?> rootConstructor = rootClass.getConstructors()[0];
         visitedClasses = new HashSet<>();
         visitedClasses.add(rootClass);
-        instatinatedClasses = new HashMap<>();
+        instatinatedClasses = new ArrayList<>();
         return construct(rootConstructor, implementationClassNames);
     }
 
@@ -50,14 +47,18 @@ public class Injector {
                 }
             }
             visitedClasses.add(param);
-            Object paramInstance;
-            if (instatinatedClasses.containsKey(param)) {
-                paramInstance = instatinatedClasses.get(param);
-            } else {
+            Object paramInstance = null;
+            for (Object instance : instatinatedClasses) {
+                if (param.isInstance(instance)) {
+                    paramInstance = instance;
+                    break;
+                }
+            }
+            if (paramInstance == null) {
                 paramInstance = construct(getClassConstructor(param, implementationClassNames), implementationClassNames);
             }
             parameterInstances.add(paramInstance);
-            instatinatedClasses.put(param, paramInstance);
+            instatinatedClasses.add(paramInstance);
             visitedClasses.remove(param);
         }
 
